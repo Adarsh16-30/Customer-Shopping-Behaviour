@@ -1,0 +1,13 @@
+# Local development / CI only. The Glue job itself runs inside AWS Glue's
+# managed PySpark environment (glue_version = "4.0" in infra/main.tf), which
+# already provides pyspark and awsglue -- do NOT pip-install awsglue, it is
+# not a real published package.
+#
+# pyspark==3.3.2 matches Glue 4.0 exactly, but its bundled cloudpickle
+# predates Python 3.12's bytecode format and will fail to serialize test
+# closures on 3.12 (PicklingError / "tuple index out of range"). 3.5.3 fixes
+# that while keeping the same DataFrame API surface used here. If your CI
+# runner is on Python <=3.10, 3.3.2 is safe and closer to production.
+
+pyspark==3.5.3
+pytest==7.4.4

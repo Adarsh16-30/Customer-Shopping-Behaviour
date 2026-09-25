@@ -124,6 +124,36 @@ Figure below shows the dashboard.
 
 
 
+## Infrastructure & Engineering Hardening
+
+The original submission was a Glue-Studio-generated script plus manually clicked-together AWS resources. The following was added on top of it:
+
+**`infra/`** — Terraform for everything that was previously created by hand in the console:
+* S3 (raw + transformed buckets) with versioning, SSE-S3 encryption, and public access fully blocked
+* Glue Catalog database, a scheduled crawler, and the transform job itself, all wired to a least-privilege IAM role (read-only on the raw bucket, read/write only on the transformed bucket — no `AmazonS3FullAccess`)
+* An EventBridge rule that catches a `FAILED`/`TIMEOUT` Glue job state and emails out via SNS, so a broken run surfaces on its own instead of requiring someone to check CloudWatch
+* A dedicated Athena workgroup with a 5GB-per-query scan cap, so a `WHERE`-less query against the 15GB dataset can't quietly run up the Athena bill
+
+Fill in `infra/terraform.tfvars.example` → `infra/terraform.tfvars` and run `terraform init && terraform apply` from `infra/`.
+
+**`src/transformations.py`** — the actual cleaning logic, pulled out of the Glue-Studio boilerplate into plain, dependency-free PySpark functions (`cast_schema`, `split_category_code`, `handle_missing_values`, `deduplicate`). Two things the original script's README claimed but the code never actually did are now implemented: null-handling (rows missing an identity/time field are dropped; `brand`/category gaps are filled with `"unknown"` rather than silently kept) and de-duplication on the event's natural key.
+
+**`glue_jobs/CleaningAndTransforming.py`** — the Glue entry point. Bucket/database/table names are now job parameters instead of hardcoded strings (`bigdataprojectbucket` etc.), output is Parquet partitioned by `event_date` instead of flat CSV (Athena then only scans the partitions a query actually touches), and every stage logs row counts so a shrinking output size shows up in CloudWatch Logs instead of going unnoticed.
+
+**`tests/`** — unit tests for `src/transformations.py` using a local `SparkSession`, with no `awsglue` package or live AWS environment needed. This is also why the transform logic lives in its own module rather than only inside the Glue script: `DynamicFrame`-based code can't be unit tested outside a Glue container, so splitting out the pure-DataFrame logic is what makes it testable at all. Run with:
+```bash
+pip install -r requirements.txt
+pytest tests/ -v
+```
+(PySpark needs a JVM — JDK 17 works locally; JDK 21 hits a `DirectByteBuffer` incompatibility in Spark's `Platform` class that `--add-opens` flags don't fix.)
+
+**`.github/workflows/ci.yml`** — runs the test suite and `terraform fmt/validate` on every push and PR.
+
+**`requirements.txt`** — pinned local dev/test dependencies. Glue provides `pyspark`/`awsglue` itself at runtime; this is only for running the tests locally and in CI.
+
+
+
+
 
 
 
