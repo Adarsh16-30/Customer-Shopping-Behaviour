@@ -169,14 +169,14 @@ resource "aws_glue_job" "transform" {
   }
 
   default_arguments = {
-    "--SOURCE_DATABASE"                 = aws_glue_catalog_database.project.name
-    "--SOURCE_TABLE"                    = "raw" # confirm against the actual crawler-generated table name after the first crawl run
-    "--TARGET_DATABASE"                 = aws_glue_catalog_database.project.name
-    "--TARGET_TABLE"                    = "transformed"
-    "--TARGET_S3_PATH"                  = "s3://${aws_s3_bucket.transformed.bucket}/cleaned/"
-    "--enable-metrics"                  = "true"
+    "--SOURCE_DATABASE"                  = aws_glue_catalog_database.project.name
+    "--SOURCE_TABLE"                     = "raw" # confirm against the actual crawler-generated table name after the first crawl run
+    "--TARGET_DATABASE"                  = aws_glue_catalog_database.project.name
+    "--TARGET_TABLE"                     = "transformed"
+    "--TARGET_S3_PATH"                   = "s3://${aws_s3_bucket.transformed.bucket}/cleaned/"
+    "--enable-metrics"                   = "true"
     "--enable-continuous-cloudwatch-log" = "true"
-    "--extra-py-files"                  = "${dirname(var.glue_script_s3_uri)}/transformations.py"
+    "--extra-py-files"                   = "${dirname(var.glue_script_s3_uri)}/transformations.py"
   }
 }
 
